@@ -20,7 +20,7 @@ public strictfp class RobotPlayer {
    * import at the top of this file. Here, we *seed* the RNG with a constant number (6147); this makes sure
    * we get the same sequence of numbers every time this code is run. This is very useful for debugging!
    */
-  static final Random rng = new Random(6147);
+  static Random rng;
 
   /** Array containing all the possible movement directions. */
   static final Direction[] directions = {
@@ -49,7 +49,7 @@ public strictfp class RobotPlayer {
 
     // You can also use indicators to save debug notes in replays.
     rc.setIndicatorString("Hello world!");
-
+    rng = new Random(rc.getID());
     MapLocation[] spawnLocs = rc.getAllySpawnLocations();
 
     while (true) {
@@ -122,25 +122,6 @@ public strictfp class RobotPlayer {
       }
       // End of loop: go back to the top. Clock.yield() has ended, so it's time for another turn!
     }
-
     // Your code should never reach here (unless it's intentional)! Self-destruction imminent...
-  }
-  public static void updateEnemyRobots(RobotController rc) throws GameActionException{
-      // Sensing methods can be passed in a radius of -1 to automatically 
-      // use the largest possible value.
-      RobotInfo[] enemyRobots = rc.senseNearbyRobots(-1, rc.getTeam().opponent());
-      if (enemyRobots.length != 0){
-          rc.setIndicatorString("There are nearby enemy robots! Scary!");
-          // Save an array of locations with enemy robots in them for future use.
-          MapLocation[] enemyLocations = new MapLocation[enemyRobots.length];
-          for (int i = 0; i < enemyRobots.length; i++){
-              enemyLocations[i] = enemyRobots[i].getLocation();
-          }
-          // Let the rest of our team know how many enemy robots we see!
-          if (rc.canWriteSharedArray(0, enemyRobots.length)){
-              rc.writeSharedArray(0, enemyRobots.length);
-              int numEnemies = rc.readSharedArray(0);
-          }
-      }
   }
 }
