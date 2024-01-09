@@ -34,7 +34,8 @@ public class Utilities {
     MapLocation current = rc.getLocation();
     Direction dirTo = current.directionTo(destination);
 
-    if(pathClear(rc,destination)){
+    MapLocation wallEncountered = lineVision(rc,destination);
+    if(wallEncountered==null){
       //go in straight line to the destination
       rc.setIndicatorLine(current,destination,255,0,0);
       //this line resets the default for going left or right around an obstacle
@@ -53,34 +54,38 @@ public class Utilities {
     return dirTo;
   }
 
-  //returns true if the path to the destination is clear, false if there's a wall in the way
-  private static boolean pathClear(RobotController rc, MapLocation destination) throws GameActionException{
+  //returns null if the path to the destination is clear
+  //returns the first wall encountered if path isn't clear
+  private static MapLocation lineVision(RobotController rc, MapLocation destination) throws GameActionException{
     //line is the straight line from the robot to its destination
     MapLocation[] line = new MapLocation[5];
     line[0]=rc.getLocation();
-    if(line[0].equals(destination)) return true;
+    if(line[0].equals(destination)) return null;
     line[1]=line[0].add(rc.getLocation().directionTo(destination));
-    if(line[1].equals(destination)) return true;
+    if(line[1].equals(destination)) return null;
     line[2]=line[1].add(rc.getLocation().directionTo(destination));
     line[3]=line[2].add(rc.getLocation().directionTo(destination));
     line[4]=line[3].add(rc.getLocation().directionTo(destination));
 
     //manually check all 4 squares
-    if(!rc.sensePassability(line[1])) return false;
-    if(line[2].equals(destination)) return true;
-    if(!rc.sensePassability(line[2])) return false;
-    if(line[3].equals(destination)) return true;
-    if(!rc.sensePassability(line[3])) return false;
-    if(line[4].equals(destination)) return true;
-    if(rc.canSenseLocation(line[4])&&!rc.sensePassability(line[4])) return false;
-    return true;
+    //note: might have to reconfigure the rc.canSenseLocations
+    if(rc.canSenseLocation(line[1])&&!rc.sensePassability(line[1])) return line[1];
+    if(line[2].equals(destination)) return null;
+    if(rc.canSenseLocation(line[2])&&!rc.sensePassability(line[2])) return line[2];
+    if(line[3].equals(destination)) return null;
+    if(rc.canSenseLocation(line[3])&&!rc.sensePassability(line[3])) return line[3];
+    if(line[4].equals(destination)) return null;
+    if(rc.canSenseLocation(line[4])&&!rc.sensePassability(line[4])) return line[4];
+    return null;
   }
 
   //returns the closest wall endpoint to the destination
   //"wall endpoint" is simply where a wall ends (ie: a corner, endpoint, or simply where the duck's vision of a wall ends)
-  private static MapLocation wallEndPoint(RobotController rc, MapLocation destination) throws GameActionException{
+  private static MapLocation wallEndPoint(RobotController rc, MapLocation destination, MapLocation firstWall) throws GameActionException{
     MapLocation current = rc.getLocation();
     Direction dirTo = current.directionTo(destination);
+
+    //starting with firstWall, check adjacent squares to see if the wall extends
 
     return null;
 
