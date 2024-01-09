@@ -68,39 +68,20 @@ public strictfp class RobotPlayer {
           for ( MapLocation loc : spawnLocs) {
             if (rc.canSpawn(loc)) { rc.spawn(loc); break; }
           }
-          System.out.println("Unable to spawn");
+          //System.out.println("Unable to spawn");
           Clock.yield();
         }
 
-        if (rc.canPickupFlag(rc.getLocation())){
-          rc.pickupFlag(rc.getLocation());
-          rc.setIndicatorString("Holding a flag!");
-        }
-        // If we are holding an enemy flag, singularly focus on moving towards
-        // an ally spawn zone to capture it! We use the check roundNum >= SETUP_ROUNDS
-        // to make sure setup phase has ended.
-        if (rc.hasFlag() && rc.getRoundNum() >= GameConstants.SETUP_ROUNDS){
-          MapLocation firstLoc = spawnLocs[0];
-          Direction dir = rc.getLocation().directionTo(firstLoc);
+        if (rc.getRoundNum() <= GameConstants.SETUP_ROUNDS&&rc.senseNearbyCrumbs(20).length>0){
+          //look for crumbs
+          MapLocation[] crumbLocations = rc.senseNearbyCrumbs(20);
+          MapLocation crumb = crumbLocations[rng.nextInt(crumbLocations.length)];
+          Direction dir = Utilities.bugNav(rc,crumb);
+          if (rc.canMove(dir)) rc.move(dir);
+        }else{
+          Direction dir = directions[rng.nextInt(directions.length)];
           if (rc.canMove(dir)) rc.move(dir);
         }
-        // Move and attack randomly if no objective.
-        Direction dir = directions[rng.nextInt(directions.length)];
-        MapLocation nextLoc = rc.getLocation().add(dir);
-        if (rc.canMove(dir)){
-          rc.move(dir);
-        }
-        else if (rc.canAttack(nextLoc)){
-          rc.attack(nextLoc);
-          System.out.println("Take that! Damaged an enemy that was in our way!");
-        }
-
-        // Rarely attempt placing traps behind the robot.
-        MapLocation prevLoc = rc.getLocation().subtract(dir);
-        if (rc.canBuild(TrapType.EXPLOSIVE, prevLoc) && rng.nextInt() % 37 == 1)
-          rc.build(TrapType.EXPLOSIVE, prevLoc);
-        // We can also move our code into different methods or classes to better organize it!
-        updateEnemyRobots(rc);
       
       } catch (GameActionException e) {
         // Oh no! It looks like we did something illegal in the Battlecode world. You should
