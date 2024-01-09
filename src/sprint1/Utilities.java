@@ -4,12 +4,45 @@ import battlecode.common.*;
 import java.util.Random;
 
 public class Utilities {
+  //default direction refers to which direction (right or left) the robot defaults to
+  //when doing stupid bugnav
+  private static boolean defaultDirection = true;
+  private static int prevH=0;
+  private static int dMin = 9999;
+  private static boolean stupidBugMode = false;
 
-  //variable that determines whether robot defaults to going left or right around an obstacle
-  private static boolean left=true;
-  //circumNavStart is how we determine if we've gone a full circle around an obstacle
-  private static MapLocation circumNavStart=null;
+  public static void tryMove(Direction d, RobotController rc) throws GameActionException{
+    if (rc.canMove(d)) rc.move(d);
+    if (rc.canMove(d.rotateLeft())) rc.move(d.rotateLeft());
+    if (rc.canMove(d.rotateRight())) rc.move(d.rotateRight());
+    if (rc.canMove(d.rotateLeft().rotateLeft())) rc.move(d.rotateLeft().rotateLeft());
+    if (rc.canMove(d.rotateRight().rotateRight())) rc.move(d.rotateRight().rotateRight());
+  }
+  public static Direction tryDirection(Direction d, RobotController rc) throws GameActionException{
+    Direction tryDirection=d;
+    if (rc.canMove(d)) return d;
 
+    tryDirection=rotateDefault(tryDirection);
+    if (rc.canMove(tryDirection)) return tryDirection;
+    tryDirection=rotateDefault(tryDirection);
+    if (rc.canMove(tryDirection)) return tryDirection;
+    tryDirection=rotateDefault(tryDirection);
+    if (rc.canMove(tryDirection)) return tryDirection;
+    tryDirection=rotateDefault(tryDirection);
+    if (rc.canMove(tryDirection)) return tryDirection;
+    tryDirection=rotateDefault(tryDirection);
+    if (rc.canMove(tryDirection)) return tryDirection;
+    tryDirection=rotateDefault(tryDirection);
+    if (rc.canMove(tryDirection)) return tryDirection;
+    tryDirection=rotateDefault(tryDirection);
+    if (rc.canMove(tryDirection)) return tryDirection;
+
+    return Direction.CENTER;
+  }
+  private static Direction rotateDefault(Direction d){
+    if(defaultDirection) return d.rotateLeft();
+    return d.rotateRight();
+  }
   // https://stackoverflow.com/questions/1519736/random-shuffling-of-an-array
   public static void shuffleArray(Object[] array) {
     int index;
@@ -28,6 +61,14 @@ public class Utilities {
     }
   }
 
+  public static boolean inBounds(MapLocation m, RobotController rc){
+    //todo: check if map height and width correspond with the max value (ie: no signpost error)
+    return m.x>=0&&m.y>=0&&m.x<=rc.getMapWidth()&&m.y<=rc.getMapHeight();
+  }
+  public static MapLocation randMapLocation(Random rng, RobotController rc){
+    return new MapLocation(rng.nextInt(rc.getMapWidth()),rng.nextInt(rc.getMapHeight()));
+  }
+
   //bugNav is a basic pathfinding algorithm
   //use it to figure out the best direction to go
   public static Direction bugNav(RobotController rc, MapLocation destination) throws GameActionException{
@@ -35,48 +76,69 @@ public class Utilities {
     Direction dirTo = current.directionTo(destination);
 
     MapLocation wallEncountered = lineVision(rc,destination);
-    if(wallEncountered==null){
-      //go in straight line to the destination
-      rc.setIndicatorLine(current,destination,255,0,0);
-      //this line resets the default for going left or right around an obstacle
-      left=(rc.getID()%2==0);
-      //reset the circumnav variable (since we're not going around an obstacle)
-      circumNavStart=null;
-      return dirTo;
+
+    //set dMin (and possible stupidBugMode)
+    if(wallEncountered.distanceSquaredTo(destination)<dMin){
+      dMin = wallEncountered.distanceSquaredTo(destination);
+      stupidBugMode=false;
+      //reset the default direction
+      defaultDirection=rc.getID()%2==0;
     }
+    
+    if(!stupidBugMode){
+      //not stupidBugMode
+      if(rc.sensePassability(wallEncountered)){
+        //go in straight line to the destination
+        rc.setIndicatorLine(current,destination,255,0,0);
+        return dirTo;
+      }
+      
+      //if we get to this point in the code, path isn't clear
+      MapLocation wallEndPoint=wallEndPoint(rc,destination,wallEncountered);
+      
+      //wallEncountered (the wall straight ahead) conveniently serves as the closest currently "sensed" point
+      if(current.distanceSquaredTo(wallEndPoint)+wallEndPoint.distanceSquaredTo(destination)<=prevH){
+        rc.setIndicatorLine(current,wallEndPoint,0,0,255);
+        prevH = current.distanceSquaredTo(wallEndPoint)+wallEndPoint.distanceSquaredTo(destination);
+        return current.directionTo(wallEndPoint);
+      }
+      //if the if statement fails, we go to stupidBugMode
+    }
+    //boundary following behavior (stupid bug)
+    stupidBugMode=true;
 
-    //if we get to this point in the code, path isn't clear
-
-    //alternate to finding the "endpoint of the wall"
-    //boundary following behavior
-
-
-    return dirTo;
+    //are we touching a wall?
+    Direction bugDirection;
+    if(touchingWall(rc)==null){
+      bugDirection= dirTo;
+    }else{
+      bugDirection=tryDirection(touchingWall(rc),rc);
+    }
+    rc.setIndicatorString("stupid bug wants to go "+bugDirection);
+    return bugDirection;
   }
 
   //returns null if the path to the destination is clear
   //returns the first wall encountered if path isn't clear
   private static MapLocation lineVision(RobotController rc, MapLocation destination) throws GameActionException{
-    //line is the straight line from the robot to its destination
-    MapLocation[] line = new MapLocation[5];
-    line[0]=rc.getLocation();
-    if(line[0].equals(destination)) return null;
-    line[1]=line[0].add(rc.getLocation().directionTo(destination));
-    if(line[1].equals(destination)) return null;
-    line[2]=line[1].add(rc.getLocation().directionTo(destination));
-    line[3]=line[2].add(rc.getLocation().directionTo(destination));
-    line[4]=line[3].add(rc.getLocation().directionTo(destination));
-
     //manually check all 4 squares
-    //note: might have to reconfigure the rc.canSenseLocations
-    if(rc.canSenseLocation(line[1])&&!rc.sensePassability(line[1])) return line[1];
-    if(line[2].equals(destination)) return null;
-    if(rc.canSenseLocation(line[2])&&!rc.sensePassability(line[2])) return line[2];
-    if(line[3].equals(destination)) return null;
-    if(rc.canSenseLocation(line[3])&&!rc.sensePassability(line[3])) return line[3];
-    if(line[4].equals(destination)) return null;
-    if(rc.canSenseLocation(line[4])&&!rc.sensePassability(line[4])) return line[4];
-    return null;
+    MapLocation current = rc.getLocation();
+    MapLocation next = current.add(current.directionTo(destination));
+    if(current.equals(destination)||!rc.canSenseLocation(next)) return current;
+
+    //line1
+    current=next;
+    next = current.add(current.directionTo(destination));
+    if(current.equals(destination)||!rc.canSenseLocation(next)||!rc.sensePassability(current)) return current;
+    //line2
+    current=next;
+    next = current.add(current.directionTo(destination));
+    if(current.equals(destination)||!rc.canSenseLocation(next)||!rc.sensePassability(current)) return current;
+    //line3
+    current=next;
+    next = current.add(current.directionTo(destination));
+    if(current.equals(destination)||!rc.canSenseLocation(next)||!rc.sensePassability(current)) return current;
+    return next;
   }
 
   //returns the closest wall endpoint to the destination
@@ -84,10 +146,69 @@ public class Utilities {
   private static MapLocation wallEndPoint(RobotController rc, MapLocation destination, MapLocation firstWall) throws GameActionException{
     MapLocation current = rc.getLocation();
     Direction dirTo = current.directionTo(destination);
+    Direction left = dirTo.rotateLeft().rotateLeft();
+    Direction right = dirTo.rotateRight().rotateRight();
 
     //starting with firstWall, check adjacent squares to see if the wall extends
+    MapLocation leftLoc = firstWall;
+    MapLocation rightLoc = firstWall;
 
+    while(rc.canSenseLocation(leftLoc)){
+      MapLocation diagLeft = leftLoc.add(left.rotateLeft());
+      MapLocation straightLeft = leftLoc.add(left);
+      MapLocation diagRight = leftLoc.add(left.rotateRight());
+      if(rc.canSenseLocation(diagLeft)&&!rc.sensePassability(diagLeft)){
+        leftLoc = diagLeft;
+        continue;
+      }
+      if(rc.canSenseLocation(straightLeft)&&!rc.sensePassability(straightLeft)){
+        leftLoc = straightLeft;
+        continue;
+      }
+      if(rc.canSenseLocation(diagRight)&&!rc.sensePassability(diagRight)){
+        leftLoc = diagRight;
+        continue;
+      }
+      break;
+    }
+    while(rc.canSenseLocation(rightLoc)){
+      MapLocation diagRight = rightLoc.add(right.rotateRight());
+      MapLocation straightRight = rightLoc.add(right);
+      MapLocation diagLeft = rightLoc.add(right.rotateLeft());
+      if(rc.canSenseLocation(diagRight)&&!rc.sensePassability(diagRight)){
+        rightLoc = diagRight;
+        continue;
+      }
+      if(rc.canSenseLocation(straightRight)&&!rc.sensePassability(straightRight)){
+        rightLoc = straightRight;
+        continue;
+      }
+      if(rc.canSenseLocation(diagLeft)&&!rc.sensePassability(diagLeft)){
+        rightLoc = diagRight;
+        continue;
+      }
+      break;
+    }
+
+    //now decide which wallEndPoint is better
+    //(leftLoc and rightLoc are the wallEndPoints)
+    if((current.distanceSquaredTo(leftLoc)+leftLoc.distanceSquaredTo(destination))<(current.distanceSquaredTo(rightLoc)+rightLoc.distanceSquaredTo(destination)) || !inBounds(rightLoc,rc)){
+      return leftLoc;
+    }
+    return rightLoc;
+
+  }
+
+  private static Direction touchingWall(RobotController rc) throws GameActionException{
+    MapLocation current = rc.getLocation();
+    if (rc.canSenseLocation(current.add(Direction.EAST)) && !rc.sensePassability(current.add(Direction.EAST))) return Direction.EAST;
+    if (rc.canSenseLocation(current.add(Direction.SOUTH)) && !rc.sensePassability(current.add(Direction.SOUTH))) return Direction.SOUTH;
+    if (rc.canSenseLocation(current.add(Direction.WEST)) && !rc.sensePassability(current.add(Direction.WEST))) return Direction.WEST;
+    if (rc.canSenseLocation(current.add(Direction.NORTH)) && !rc.sensePassability(current.add(Direction.NORTH))) return Direction.NORTH;
+    if (rc.canSenseLocation(current.add(Direction.SOUTHEAST)) && !rc.sensePassability(current.add(Direction.SOUTHEAST))) return Direction.SOUTHEAST;
+    if (rc.canSenseLocation(current.add(Direction.SOUTHWEST)) && !rc.sensePassability(current.add(Direction.SOUTHWEST))) return Direction.SOUTHWEST;
+    if (rc.canSenseLocation(current.add(Direction.NORTHWEST)) && !rc.sensePassability(current.add(Direction.NORTHWEST))) return Direction.NORTHWEST;
+    if (rc.canSenseLocation(current.add(Direction.NORTHEAST)) && !rc.sensePassability(current.add(Direction.NORTHEAST))) return Direction.NORTHEAST;
     return null;
-
   }
 }
