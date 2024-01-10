@@ -65,6 +65,14 @@ public strictfp class RobotPlayer {
           //System.out.println("Unable to spawn");
           Clock.yield();
         }
+
+        //buy Action if available
+        if(rc.canBuyGlobal(GlobalUpgrade.ACTION)){
+          rc.buyGlobal(GlobalUpgrade.ACTION);
+        }
+        
+
+
         Utilities.fight(rc);
         if (rc.getRoundNum() <= GameConstants.SETUP_ROUNDS&&rc.senseNearbyCrumbs(20).length>0){
           //look for crumbs
