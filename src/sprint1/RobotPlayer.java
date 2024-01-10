@@ -65,7 +65,7 @@ public strictfp class RobotPlayer {
           //System.out.println("Unable to spawn");
           Clock.yield();
         }
-
+        Utilities.fight(rc);
         if (rc.getRoundNum() <= GameConstants.SETUP_ROUNDS&&rc.senseNearbyCrumbs(20).length>0){
           //look for crumbs
           MapLocation[] crumbLocations = rc.senseNearbyCrumbs(20);

@@ -211,4 +211,62 @@ public class Utilities {
     if (rc.canSenseLocation(current.add(Direction.NORTHEAST)) && !rc.sensePassability(current.add(Direction.NORTHEAST))) return Direction.NORTHEAST;
     return null;
   }
+
+  public static void fight(RobotController rc) throws GameActionException{
+    MapLocation current = rc.getLocation();
+    RobotInfo[] enemies = rc.senseNearbyRobots(-1, rc.getTeam().opponent());
+    if(enemies.length==0) return;
+    RobotInfo[] enemiesWithinAttack = rc.senseNearbyRobots(4, rc.getTeam().opponent());
+
+    //retreat logic
+
+    if(enemiesWithinAttack.length>0&&!(rc.getActionCooldownTurns()>=10)){
+      //retreat because you can't attack
+      tryMove(enemiesWithinAttack[0].getLocation().directionTo(current),rc);
+    }
+
+    if(rc.getHealth()<225){
+      //retreat cuz low health
+      tryMove(enemies[0].getLocation().directionTo(current),rc);
+    }
+    //end retreat logic
+
+    //TODO: put enemy targets in shared array
+
+    //the next stuff has to do with attacking, so return if we can't attack
+    if(rc.getActionCooldownTurns()>=10) return;
+
+    if(rc.getMovementCooldownTurns()<10){
+      //can move, increase our attack range by one movement
+      enemiesWithinAttack = rc.senseNearbyRobots(6, rc.getTeam().opponent());
+    }
+
+    //this shouldn't ever happen but just in case
+    if(enemiesWithinAttack.length==0) return;
+
+    //find the weakest enemy to attack
+    RobotInfo weakestEnemy = enemiesWithinAttack[0];
+    for(int i=1;i<enemiesWithinAttack.length;++i){
+      if(enemiesWithinAttack[i].getHealth()<weakestEnemy.getHealth()){
+        weakestEnemy = enemiesWithinAttack[i];
+      }
+      //break ties by picking enemies that are further away to attack
+      if(enemiesWithinAttack[i].getHealth()<=weakestEnemy.getHealth() && enemiesWithinAttack[i].getLocation().distanceSquaredTo(current)>weakestEnemy.getLocation().distanceSquaredTo(current)){
+        weakestEnemy = enemiesWithinAttack[i];
+      }
+    }
+
+    //attack
+    if(rc.canAttack(weakestEnemy.getLocation())){
+      rc.attack(weakestEnemy.getLocation());
+    }else{
+      //move and attack
+      if(rc.canMove(current.directionTo(weakestEnemy.getLocation()))){
+        rc.move(current.directionTo(weakestEnemy.getLocation()));
+      }
+      if(rc.canAttack(weakestEnemy.getLocation())){
+        rc.attack(weakestEnemy.getLocation());
+      }
+    }
+  }
 }
