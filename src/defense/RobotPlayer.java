@@ -1,9 +1,9 @@
-package sprint1;
+package defense;
 
 import battlecode.common.*;
 
 import java.util.Random;
-import sprint1.Utilities;
+import defense.Utilities;
 
 public strictfp class RobotPlayer {
 
@@ -35,6 +35,8 @@ public strictfp class RobotPlayer {
   };
 
   static MapLocation destination=null;
+  static boolean isExplorer = false;
+  static MapLocation waterTrapBuilt = null;
   /**
    * run() is the method that is called when a robot is instantiated in the Battlecode world.
    * It is like the main function for your robot. If this method returns, the robot dies!
@@ -60,7 +62,14 @@ public strictfp class RobotPlayer {
         while (!rc.isSpawned()) {
           Utilities.shuffleArray(spawnLocs);
           for ( MapLocation loc : spawnLocs) {
-            if (rc.canSpawn(loc)) { rc.spawn(loc); break; }
+            if (rc.canSpawn(loc)) { 
+              rc.spawn(loc);
+              if(rc.readSharedArray(0)<5){
+                isExplorer=true;
+                rc.writeSharedArray(0,rc.readSharedArray(0)+1);
+              } 
+              break; 
+            }
           }
           //System.out.println("Unable to spawn");
           Clock.yield();
@@ -71,46 +80,62 @@ public strictfp class RobotPlayer {
           rc.buyGlobal(GlobalUpgrade.ACTION);
         }
 
-
-
-        Utilities.fight(rc);
-        if (rc.getRoundNum() <= GameConstants.SETUP_ROUNDS&&rc.senseNearbyCrumbs(20).length>0){
-          //look for crumbs
-          MapLocation[] crumbLocations = rc.senseNearbyCrumbs(20);
-          destination = crumbLocations[rng.nextInt(crumbLocations.length)];
+        //if we're touching the centerwall (and we can move and build)
+        if(rc.getMovementCooldownTurns()<10 && rc.getActionCooldownTurns()<10){
+          Direction toWall = Utilities.touchingWall(rc);
+          if(toWall!=null && (Utilities.isCenterWall(rc.getLocation().add(toWall),rc)||rc.getRoundNum()>200)&&rc.getCrumbs()>=200){
+            MapLocation toBuild = rc.getLocation();
+            if (rc.canMove(toWall.opposite())){
+              rc.move(toWall.opposite());
+              if(rc.canBuild(TrapType.WATER,toBuild)){
+                rc.build(TrapType.WATER, toBuild);
+                waterTrapBuilt = toBuild;
+              }
+            }
+          }
         }
+        if(waterTrapBuilt!=null){
+          //if you just built a water trap, build two explosion traps 2 blocks away in the opposite direction
+          Direction awayFromDivider = waterTrapBuilt.directionTo(rc.getLocation());
+          if(rc.canBuild(TrapType.STUN,rc.getLocation().add(awayFromDivider))){
+            rc.build(TrapType.STUN,rc.getLocation().add(awayFromDivider));
+          }
+          if(rc.canBuild(TrapType.STUN,rc.getLocation().add(awayFromDivider.rotateLeft()))){
+            rc.build(TrapType.STUN,rc.getLocation().add(awayFromDivider.rotateLeft()));
+          }
+          if(rc.canBuild(TrapType.STUN,rc.getLocation().add(awayFromDivider.rotateRight()))){
+            rc.build(TrapType.STUN,rc.getLocation().add(awayFromDivider.rotateRight()));
+          }
+          waterTrapBuilt = null;
+        }else{
+          Utilities.fight(rc);
+          if (isExplorer && rc.getRoundNum() <= GameConstants.SETUP_ROUNDS&&rc.senseNearbyCrumbs(20).length>0){
+            //look for crumbs
+            MapLocation[] crumbLocations = rc.senseNearbyCrumbs(20);
+            destination = crumbLocations[rng.nextInt(crumbLocations.length)];
+          }
 
-        //move to a random location on the map
-        if(destination==null||destination.equals(rc.getLocation())) destination=Utilities.randMapLocation(rng, rc);
-        rc.setIndicatorDot(destination,255,0,0);
-        Direction dir = Utilities.bugNav(rc,destination);
-        //if the random location is impossible to get to, pick a new one
-        if(dir==null){
-          destination=Utilities.randMapLocation(rng, rc);
-          dir = Utilities.bugNav(rc,destination);
-          if(dir == null) dir = Direction.CENTER;
-        }  
-        Utilities.tryMove(dir, rc);
-      
+          //move to a random location on the map
+          if(destination==null||destination.equals(rc.getLocation())) destination=Utilities.randMapLocation(rng, rc);
+          rc.setIndicatorDot(destination,255,0,0);
+          Direction dir = Utilities.bugNav(rc,destination);
+          //if the random location is impossible to get to, pick a new one
+          if(dir==null){
+            destination=Utilities.randMapLocation(rng, rc);
+            dir = Utilities.bugNav(rc,destination);
+            if(dir == null) dir = Direction.CENTER;
+          }
+          Utilities.tryMove(dir, rc);
+        }
       } catch (GameActionException e) {
-        // Oh no! It looks like we did something illegal in the Battlecode world. You should
-        // handle GameActionExceptions judiciously, in case unexpected events occur in the game
-        // world. Remember, uncaught exceptions cause your robot to explode!
         System.out.println("GameActionException");
         e.printStackTrace();
-
       } catch (Exception e) {
-        // Oh no! It looks like our code tried to do something bad. This isn't a
-        // GameActionException, so it's more likely to be a bug in our code.
         System.out.println("Exception");
         e.printStackTrace();
-
       } finally {
-        // Signify we've done everything we want to do, thereby ending our turn.
-        // This will make our code wait until the next turn, and then perform this loop again.
         Clock.yield();
       }
-      // End of loop: go back to the top. Clock.yield() has ended, so it's time for another turn!
     }
     // Your code should never reach here (unless it's intentional)! Self-destruction imminent...
   }
