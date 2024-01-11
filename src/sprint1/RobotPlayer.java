@@ -34,7 +34,7 @@ public strictfp class RobotPlayer {
     Direction.NORTHWEST,
   };
 
-  static MapLocation randLocation=null;
+  static MapLocation destination=null;
   /**
    * run() is the method that is called when a robot is instantiated in the Battlecode world.
    * It is like the main function for your robot. If this method returns, the robot dies!
@@ -70,21 +70,26 @@ public strictfp class RobotPlayer {
         if(rc.canBuyGlobal(GlobalUpgrade.ACTION)){
           rc.buyGlobal(GlobalUpgrade.ACTION);
         }
-        
+
 
 
         Utilities.fight(rc);
         if (rc.getRoundNum() <= GameConstants.SETUP_ROUNDS&&rc.senseNearbyCrumbs(20).length>0){
           //look for crumbs
           MapLocation[] crumbLocations = rc.senseNearbyCrumbs(20);
-          MapLocation crumb = crumbLocations[rng.nextInt(crumbLocations.length)];
-          Direction dir = Utilities.bugNav(rc,crumb);
-          Utilities.tryMove(dir, rc);
-        }else{
-          if(randLocation==null||randLocation.equals(rc.getLocation())) randLocation=Utilities.randMapLocation(rng, rc);
-          Direction dir = Utilities.bugNav(rc,randLocation);
-          Utilities.tryMove(dir, rc);
+          destination = crumbLocations[rng.nextInt(crumbLocations.length)];
         }
+
+        //move to a random location on the map
+        if(destination==null||destination.equals(rc.getLocation())) destination=Utilities.randMapLocation(rng, rc);
+        rc.setIndicatorDot(destination,255,0,0);
+        Direction dir = Utilities.bugNav(rc,destination);
+        //if the random location is impossible to get to, pick a new one
+        while(dir==null){
+          destination=Utilities.randMapLocation(rng, rc);
+          dir = Utilities.bugNav(rc,destination);
+        }  
+        Utilities.tryMove(dir, rc);
       
       } catch (GameActionException e) {
         // Oh no! It looks like we did something illegal in the Battlecode world. You should
