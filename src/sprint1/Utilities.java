@@ -467,6 +467,8 @@ public class Utilities {
     //the next stuff has to do with attacking, so return if we can't attack
     if(rc.getActionCooldownTurns()>=10) return;
 
+    if(enemies.length>5)  bomb(rc);
+
     if(rc.getMovementCooldownTurns()<10){
       //can move, increase our attack range by one movement
       enemiesWithinAttack = rc.senseNearbyRobots(6, rc.getTeam().opponent());
@@ -530,5 +532,13 @@ public class Utilities {
       }
     }
 
+  }
+
+  private static void bomb(RobotController rc) throws GameActionException{
+    Direction[] d = Direction.allDirections();
+    for(int i=0;i<d.length;++i){
+      if(rc.canBuild(TrapType.EXPLOSIVE,rc.getLocation().add(d[i])))
+        rc.build(TrapType.EXPLOSIVE, rc.getLocation().add(d[i]));
+    }
   }
 }
