@@ -116,6 +116,7 @@ public class Utilities {
       //rc.setIndicatorString("prevH: "+prevH+" currentH; "+currentH);
       if(currentH<prevH){
         rc.setIndicatorLine(current,wallEndPoint,0,255,0);
+        rc.setIndicatorString("wall in the way, routing to wallEndPoint: "+wallEndPoint);
         prevH = currentH;
         return current.directionTo(wallEndPoint);
       }
@@ -125,38 +126,42 @@ public class Utilities {
     }
     //boundary following behavior (stupid bug)
     stupidBugMode=true;
-
-    rc.setIndicatorDot(lastWall,0,255,255);
-    if(!rc.canSenseLocation(lastWall)||rc.sensePassability(lastWall)){
+    rc.setIndicatorString("stupid bug mode");
+    rc.setIndicatorDot(lastWall,0,255,0);
+    if(rc.canSenseLocation(lastWall)&&rc.sensePassability(lastWall)){
+      rc.setIndicatorString("catastrophic error: lastWall isn't a wall: "+lastWall);
+      resetBugNav(destination);
       return Direction.CENTER;
     }
-    Direction d = current.directionTo(lastWall);
-    Direction leftorRight = rotateDefault(rotateDefault(d));
-    if(!isCardinalDirection(d)){
-      leftorRight = rotateDefault(leftorRight);
-      d = rotateDefault(d);
-    }
-    lastWall = followWall(lastWall,leftorRight,d,rc);
+    
+    //this could run into trouble if we get pinned against a wall by other ducks
+    if(touchingOutOfBounds(rc)!=null) defaultDirection = !defaultDirection;
+
+    //update the wall we are looking at
+    lastWall = bugLook(rc,lastWall);
 
     if(preventLooping==null){
-      preventLooping=current;
+      if(current.distanceSquaredTo(lastWall)<=2)
+        preventLooping=current;
     }else if(preventLooping.equals(current)){
       rc.setIndicatorString("fuck this shit, I'm done");
       return null;
     }
-    rc.setIndicatorDot(preventLooping,255,0,255);
+    if(preventLooping!=null)  rc.setIndicatorDot(preventLooping,255,0,255);
+    
     return tryDirection(current.directionTo(lastWall), rc);
     //rc.setIndicatorString("lastWall: "+lastWall);
     //return Direction.CENTER;
   }
 
   //resets the bugnav variables when navigating to a new destination
-  private static void resetBugNav(MapLocation destination){
+  public static void resetBugNav(MapLocation destination){
       currentDestination = destination;
       prevH = 9999;
       dMin = 9999;
       stupidBugMode = false;
       preventLooping=null;
+      lastWall=null;
   }
 
   //returns null if the path to the destination is clear
@@ -231,6 +236,76 @@ public class Utilities {
 
   }
 
+  //returns adjacent wall MapLocation (the wall the bug is hugging)
+  //if not adjacent to any walls, returns lastWall
+  private static MapLocation bugLook(RobotController rc, MapLocation lastWall) throws GameActionException{
+    MapLocation current = rc.getLocation();
+    Direction bugLookDirection = current.directionTo(lastWall);
+    MapLocation bugLookLocation = current.add(bugLookDirection);
+    MapInfo bugLookMapInfo = null;
+
+    //1
+    if(rc.canSenseLocation(bugLookLocation)){
+      bugLookMapInfo = rc.senseMapInfo(bugLookLocation);
+      if(bugLookMapInfo.isWall()||bugLookMapInfo.isDam()||bugLookMapInfo.isWater()) lastWall = bugLookLocation;
+      else return lastWall;
+    }
+    bugLookDirection = rotateDefault(bugLookDirection);
+    bugLookLocation = current.add(bugLookDirection); 
+
+    //2
+    if(rc.canSenseLocation(bugLookLocation)){
+      bugLookMapInfo = rc.senseMapInfo(bugLookLocation);
+      if(bugLookMapInfo.isWall()||bugLookMapInfo.isDam()||bugLookMapInfo.isWater()) lastWall = bugLookLocation;
+      else return lastWall;
+    }
+    bugLookDirection = rotateDefault(bugLookDirection);
+    bugLookLocation = current.add(bugLookDirection); 
+
+    //3
+    if(rc.canSenseLocation(bugLookLocation)){
+      bugLookMapInfo = rc.senseMapInfo(bugLookLocation);
+      if(bugLookMapInfo.isWall()||bugLookMapInfo.isDam()||bugLookMapInfo.isWater()) lastWall = bugLookLocation;
+      else return lastWall;
+    }
+    bugLookDirection = rotateDefault(bugLookDirection);
+    bugLookLocation = current.add(bugLookDirection);
+    
+    //4
+    if(rc.canSenseLocation(bugLookLocation)){
+      bugLookMapInfo = rc.senseMapInfo(bugLookLocation);
+      if(bugLookMapInfo.isWall()||bugLookMapInfo.isDam()||bugLookMapInfo.isWater()) lastWall = bugLookLocation;
+      else return lastWall;
+    }
+    bugLookDirection = rotateDefault(bugLookDirection);
+    bugLookLocation = current.add(bugLookDirection);
+    
+    //5
+    if(rc.canSenseLocation(bugLookLocation)){
+      bugLookMapInfo = rc.senseMapInfo(bugLookLocation);
+      if(bugLookMapInfo.isWall()||bugLookMapInfo.isDam()||bugLookMapInfo.isWater()) lastWall = bugLookLocation;
+      else return lastWall;
+    }
+    bugLookDirection = rotateDefault(bugLookDirection);
+    bugLookLocation = current.add(bugLookDirection);
+    
+    //6
+    if(rc.canSenseLocation(bugLookLocation)){
+      bugLookMapInfo = rc.senseMapInfo(bugLookLocation);
+      if(bugLookMapInfo.isWall()||bugLookMapInfo.isDam()||bugLookMapInfo.isWater()) lastWall = bugLookLocation;
+      else return lastWall;
+    }
+    bugLookDirection = rotateDefault(bugLookDirection);
+    bugLookLocation = current.add(bugLookDirection); 
+
+    //7
+    if(rc.canSenseLocation(bugLookLocation)){
+      bugLookMapInfo = rc.senseMapInfo(bugLookLocation);
+      if(bugLookMapInfo.isWall()||bugLookMapInfo.isDam()||bugLookMapInfo.isWater()) lastWall = bugLookLocation;
+    }
+
+    return lastWall;
+  }
   //followWall finds the "endpoint" of a wall in a given direction (either where the wall ends or where vision of the wall ends)
   //Wall must be a wall/impassible terrain that is bordering a square that is passible
   //rightOrLeft and Forwards must form a 90 degree angle and they must be cardinal directions
@@ -316,6 +391,18 @@ public class Utilities {
     if (!rc.canSenseLocation(current.add(Direction.SOUTHWEST)) || !rc.sensePassability(current.add(Direction.SOUTHWEST)) && !rc.canSenseRobotAtLocation(current.add(Direction.SOUTHWEST))) return Direction.SOUTHWEST;
     if (!rc.canSenseLocation(current.add(Direction.NORTHWEST)) || !rc.sensePassability(current.add(Direction.NORTHWEST)) && !rc.canSenseRobotAtLocation(current.add(Direction.NORTHWEST))) return Direction.NORTHWEST;
     if (!rc.canSenseLocation(current.add(Direction.NORTHEAST)) || !rc.sensePassability(current.add(Direction.NORTHEAST)) && !rc.canSenseRobotAtLocation(current.add(Direction.NORTHEAST))) return Direction.NORTHEAST;
+    return null;
+  }
+
+  public static Direction touchingOutOfBounds(RobotController rc) throws GameActionException{
+    MapLocation current = rc.getLocation();
+    if(!rc.canSenseLocation(current.add(Direction.EAST))) return Direction.EAST;
+    if(!rc.canSenseLocation(current.add(Direction.NORTH))) return Direction.NORTH;
+    if(!rc.canSenseLocation(current.add(Direction.NORTHEAST))) return Direction.NORTHEAST;
+    if(!rc.canSenseLocation(current.add(Direction.NORTHWEST))) return Direction.NORTHWEST;
+    if(!rc.canSenseLocation(current.add(Direction.SOUTH))) return Direction.SOUTH;
+    if(!rc.canSenseLocation(current.add(Direction.SOUTHEAST))) return Direction.SOUTHEAST;
+    if(!rc.canSenseLocation(current.add(Direction.WEST))) return Direction.WEST;
     return null;
   }
 

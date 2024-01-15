@@ -35,7 +35,7 @@ public strictfp class RobotPlayer {
   };
 
   static MapLocation destination=null;
-  static boolean crumb = false;
+  static boolean isExplorer = false;
   /**
    * run() is the method that is called when a robot is instantiated in the Battlecode world.
    * It is like the main function for your robot. If this method returns, the robot dies!
@@ -59,15 +59,21 @@ public strictfp class RobotPlayer {
         // Make sure you spawn your robot in before you attempt to take any actions!
         // Robots not spawned in do not have vision of any tiles and cannot perform any actions.
         while (!rc.isSpawned()) {
-          //Utilities.shuffleArray(spawnLocs);
-          /*
+          Utilities.shuffleArray(spawnLocs);
           for ( MapLocation loc : spawnLocs) {
-            if (rc.canSpawn(loc)) { rc.spawn(loc); break; }
+            if (rc.canSpawn(loc)) { 
+              rc.spawn(loc); 
+              if(rc.readSharedArray(0)<5){
+                isExplorer=true;
+                rc.writeSharedArray(0,rc.readSharedArray(0)+1);
+              }
+              Utilities.resetBugNav(null);
+              break; 
+            }
           }
-          */
-          if (rc.canSpawn(spawnLocs[0])) { rc.spawn(spawnLocs[0]);}
-          //System.out.println("Unable to spawn");
-          Clock.yield();
+          if(!rc.isSpawned())
+            Clock.yield();
+          
         }
 
         //buy Action if available
@@ -75,32 +81,26 @@ public strictfp class RobotPlayer {
           rc.buyGlobal(GlobalUpgrade.ACTION);
         }
 
-
-
         Utilities.fight(rc);
         Utilities.heal(rc);
-        if (!crumb&&rc.getRoundNum() <= GameConstants.SETUP_ROUNDS&&rc.senseNearbyCrumbs(20).length>0){
+        if (isExplorer && rc.getRoundNum() <= GameConstants.SETUP_ROUNDS&&rc.senseNearbyCrumbs(20).length>0){
           //look for crumbs
           MapLocation[] crumbLocations = rc.senseNearbyCrumbs(20);
           destination = crumbLocations[rng.nextInt(crumbLocations.length)];
-          crumb=true;
         }
 
         //move to a random location on the map
-        if(destination==null||destination.equals(rc.getLocation())){
-          destination=Utilities.randMapLocation(rng, rc);
-          crumb=false;
-        } 
+        if(destination==null||destination.equals(rc.getLocation())) destination=Utilities.randMapLocation(rng, rc);
         rc.setIndicatorDot(destination,255,0,0);
         Direction dir = Utilities.bugNav(rc,destination);
         //if the random location is impossible to get to, pick a new one
         if(dir==null){
           destination=Utilities.randMapLocation(rng, rc);
-          dir = Direction.CENTER;
-          crumb=false;
-        }  
+          dir = Utilities.bugNav(rc,destination);
+          if(dir == null) dir = Direction.CENTER;
+        }
         Utilities.tryMove(dir, rc);
-      
+
       } catch (GameActionException e) {
         // Oh no! It looks like we did something illegal in the Battlecode world. You should
         // handle GameActionExceptions judiciously, in case unexpected events occur in the game
