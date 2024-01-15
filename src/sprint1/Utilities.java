@@ -8,11 +8,11 @@ public class Utilities {
   //when doing stupid bugnav
   private static MapLocation currentDestination = null;
   private static boolean defaultDirection = true;
-  private static int prevH = 0;
-  private static int dMin = 9999;
+  private static int prevH = 9999; 
+  private static int dMin = 9999; //shortest distance of any point found to the destination
   private static boolean stupidBugMode = false;
   private static MapLocation preventLooping = null;
-  private static MapLocation lastWallHugged = null;
+  private static MapLocation lastWall = null;
 
   public static void tryMove(Direction d, RobotController rc) throws GameActionException{
     if (rc.canMove(d)) rc.move(d);
@@ -21,6 +21,7 @@ public class Utilities {
     if (rc.canMove(d.rotateLeft().rotateLeft())) rc.move(d.rotateLeft().rotateLeft());
     if (rc.canMove(d.rotateRight().rotateRight())) rc.move(d.rotateRight().rotateRight());
   }
+  
   public static Direction tryDirection(Direction d, RobotController rc) throws GameActionException{
     Direction tryDirection=d;
     if (rc.canMove(d)) return d;
@@ -46,6 +47,7 @@ public class Utilities {
     if(defaultDirection) return d.rotateLeft();
     return d.rotateRight();
   }
+
   // https://stackoverflow.com/questions/1519736/random-shuffling-of-an-array
   public static void shuffleArray(Object[] array) {
     int index;
@@ -85,75 +87,76 @@ public class Utilities {
     Direction dirTo = current.directionTo(destination);
 
     MapLocation wallEncountered = lineVision(rc,destination);
+    rc.setIndicatorLine(current,wallEncountered,0,0,255);
 
     //set dMin (and possible stupidBugMode)
     if(wallEncountered.distanceSquaredTo(destination)<dMin){
       //rc.setIndicatorString("prev dMin: "+dMin+" new dMin: "+wallEncountered.distanceSquaredTo(destination));
-      rc.setIndicatorDot(wallEncountered,0,0,255);
       dMin = wallEncountered.distanceSquaredTo(destination);
       stupidBugMode=false;
-      lastWallHugged = null;
       //reset the default direction
       defaultDirection=rc.getID()%2==0;
     }
-    
+
     if(!stupidBugMode){
       //not stupidBugMode
       if(rc.sensePassability(wallEncountered)){
         //go in straight line to the destination
         rc.setIndicatorLine(current,destination,255,0,0);
+        rc.setIndicatorString("straight shot to "+destination);
         return dirTo;
       }
       
       //if we get to this point in the code, path isn't clear
       MapLocation wallEndPoint=wallEndPoint(rc,destination,wallEncountered);
       
-      //wallEncountered (the wall straight ahead) conveniently serves as the closest currently "sensed" point
-      if(current.distanceSquaredTo(wallEndPoint)+wallEndPoint.distanceSquaredTo(destination)<=prevH){
-        rc.setIndicatorLine(current,wallEndPoint,0,0,255);
-        prevH = current.distanceSquaredTo(wallEndPoint)+wallEndPoint.distanceSquaredTo(destination);
+      int currentH = current.distanceSquaredTo(wallEndPoint)+wallEndPoint.distanceSquaredTo(destination);
+      //H is the distance to the wall endpoint + distance from wall endpoint to the destination
+      //as long as H keeps getting better, we move towards H
+      //rc.setIndicatorString("prevH: "+prevH+" currentH; "+currentH);
+      if(currentH<prevH){
+        rc.setIndicatorLine(current,wallEndPoint,0,255,0);
+        prevH = currentH;
         return current.directionTo(wallEndPoint);
       }
       //if the if statement fails, we go to stupidBugMode
-      preventLooping = wallEncountered;
+      //if(current.distanceSquaredTo(wallEncountered)>2)  System.out.println(current+": Catestrophic error in transitioning to stupid bugnav (not adjacent to correct wall)");
+      lastWall=wallEndPoint;
     }
     //boundary following behavior (stupid bug)
     stupidBugMode=true;
 
-    rc.setIndicatorDot(preventLooping,0,255,0);
-    //are we touching a wall?
-    Direction bugDirection;
-    if(touchingWall(rc)==null){
-      //find wall
-      if(lastWallHugged == null){
-        bugDirection = dirTo;
-      }else{
-        bugDirection = current.directionTo(lastWallHugged);
-      }
-    }else{
-      lastWallHugged=current.add(touchingWall(rc));
-      bugDirection=tryDirection(touchingWall(rc),rc);
+    rc.setIndicatorDot(lastWall,0,255,255);
+    if(!rc.canSenseLocation(lastWall)||rc.sensePassability(lastWall)){
+      return Direction.CENTER;
     }
-    rc.setIndicatorString("stupid bug wants to go "+bugDirection);
+    Direction d = current.directionTo(lastWall);
+    Direction leftorRight = rotateDefault(rotateDefault(d));
+    if(!isCardinalDirection(d)){
+      leftorRight = rotateDefault(leftorRight);
+      d = rotateDefault(d);
+    }
+    lastWall = followWall(lastWall,leftorRight,d,rc);
 
-    //check that we haven't done a complete loop
-    if(current.distanceSquaredTo(preventLooping)<=2){
-      //this also runs if the duck hasn't moved since it touched the wall (ie: it got blocked by a bunch of other ducks)
-      rc.setIndicatorString("stupid bug wants to go "+bugDirection+" full loop, fuck this shit");
-      //we can't use DIRECTION.CENTER bc sometimes tryDirection won't be able to move cuz its surrounded by ducks
+    if(preventLooping==null){
+      preventLooping=current;
+    }else if(preventLooping.equals(current)){
+      rc.setIndicatorString("fuck this shit, I'm done");
       return null;
     }
-    return bugDirection;
+    rc.setIndicatorDot(preventLooping,255,0,255);
+    return tryDirection(current.directionTo(lastWall), rc);
+    //rc.setIndicatorString("lastWall: "+lastWall);
+    //return Direction.CENTER;
   }
 
   //resets the bugnav variables when navigating to a new destination
   private static void resetBugNav(MapLocation destination){
       currentDestination = destination;
-      prevH = 0;
+      prevH = 9999;
       dMin = 9999;
       stupidBugMode = false;
-      preventLooping = null;
-      lastWallHugged = null;
+      preventLooping=null;
   }
 
   //returns null if the path to the destination is clear
@@ -179,6 +182,29 @@ public class Utilities {
     return next;
   }
 
+  //returns null if the path to the destination is clear
+  //returns the first wall encountered if path isn't clear
+  private static MapLocation lineVision(RobotController rc, Direction d) throws GameActionException{
+    //manually check all 4 squares
+    MapLocation current = rc.getLocation();
+    MapLocation next = current.add(d);
+    if(!rc.canSenseLocation(next)) return current;
+
+    //line1
+    current=next;
+    next = current.add(d);
+    if(!rc.canSenseLocation(next)||!rc.sensePassability(current)) return current;
+    //line2
+    current=next;
+    next = current.add(d);
+    if(!rc.canSenseLocation(next)||!rc.sensePassability(current)) return current;
+    //line3
+    current=next;
+    next = current.add(d);
+    if(!rc.canSenseLocation(next)||!rc.sensePassability(current)) return current;
+    return next;
+  }
+
   //returns the closest wall endpoint to the destination
   //"wall endpoint" is simply where a wall ends (ie: a corner, endpoint, or simply where the duck's vision of a wall ends)
   private static MapLocation wallEndPoint(RobotController rc, MapLocation destination, MapLocation firstWall) throws GameActionException{
@@ -186,48 +212,16 @@ public class Utilities {
     Direction dirTo = current.directionTo(destination);
     Direction left = dirTo.rotateLeft().rotateLeft();
     Direction right = dirTo.rotateRight().rotateRight();
-
-    //starting with firstWall, check adjacent squares to see if the wall extends
-    MapLocation leftLoc = firstWall;
-    MapLocation rightLoc = firstWall;
-
-    while(rc.canSenseLocation(leftLoc)){
-      MapLocation diagLeft = leftLoc.add(left.rotateLeft());
-      MapLocation straightLeft = leftLoc.add(left);
-      MapLocation diagRight = leftLoc.add(left.rotateRight());
-      if(rc.canSenseLocation(diagLeft)&&!rc.sensePassability(diagLeft)){
-        leftLoc = diagLeft;
-        continue;
-      }
-      if(rc.canSenseLocation(straightLeft)&&!rc.sensePassability(straightLeft)){
-        leftLoc = straightLeft;
-        continue;
-      }
-      if(rc.canSenseLocation(diagRight)&&!rc.sensePassability(diagRight)){
-        leftLoc = diagRight;
-        continue;
-      }
-      break;
+    if(!isCardinalDirection(dirTo)){
+      left=left.rotateLeft();
+      right=right.rotateLeft();
+      dirTo=dirTo.rotateLeft();
     }
-    while(rc.canSenseLocation(rightLoc)){
-      MapLocation diagRight = rightLoc.add(right.rotateRight());
-      MapLocation straightRight = rightLoc.add(right);
-      MapLocation diagLeft = rightLoc.add(right.rotateLeft());
-      if(rc.canSenseLocation(diagRight)&&!rc.sensePassability(diagRight)){
-        rightLoc = diagRight;
-        continue;
-      }
-      if(rc.canSenseLocation(straightRight)&&!rc.sensePassability(straightRight)){
-        rightLoc = straightRight;
-        continue;
-      }
-      if(rc.canSenseLocation(diagLeft)&&!rc.sensePassability(diagLeft)){
-        rightLoc = diagRight;
-        continue;
-      }
-      break;
-    }
-
+    MapLocation leftLoc = followWall(firstWall,left,dirTo,rc);
+    MapLocation rightLoc = followWall(firstWall,right,dirTo,rc);
+    
+    rc.setIndicatorDot(leftLoc,255,0,255);
+    rc.setIndicatorDot(rightLoc,0,255,255);
     //now decide which wallEndPoint is better
     //(leftLoc and rightLoc are the wallEndPoints)
     if((current.distanceSquaredTo(leftLoc)+leftLoc.distanceSquaredTo(destination))<(current.distanceSquaredTo(rightLoc)+rightLoc.distanceSquaredTo(destination)) || !inBounds(rightLoc,rc)){
@@ -237,7 +231,82 @@ public class Utilities {
 
   }
 
-  private static Direction touchingWall(RobotController rc) throws GameActionException{
+  //followWall finds the "endpoint" of a wall in a given direction (either where the wall ends or where vision of the wall ends)
+  //Wall must be a wall/impassible terrain that is bordering a square that is passible
+  //rightOrLeft and Forwards must form a 90 degree angle and they must be cardinal directions
+  public static MapLocation followWall(MapLocation wall, Direction rightOrLeft, Direction forwards, RobotController rc) throws GameActionException{
+    if(!rc.canSenseLocation(wall)||rc.sensePassability(wall)) throw new GameActionException(GameActionExceptionType.CANT_DO_THAT,"invalid wall: "+wall);
+    if(!isCardinalDirection(rightOrLeft)) throw new GameActionException(GameActionExceptionType.CANT_DO_THAT, "rightOrLeft isn't a cardinal direction: "+rightOrLeft);
+    if(!isCardinalDirection(forwards)) throw new GameActionException(GameActionExceptionType.CANT_DO_THAT, "forwards isn't a cardinal direction: "+rightOrLeft);
+    if(rightOrLeft.dx==forwards.dx||rightOrLeft.dy==forwards.dy) throw new GameActionException(GameActionExceptionType.CANT_DO_THAT, "rightOrLeft: "+rightOrLeft+" and forwards: "+forwards+" aren't 90 degrees apart");
+    Direction prevDirection = rightOrLeft;
+    while(rc.canSenseLocation(wall)){
+      //the first two directions (left and backwards) take immediate precedent
+      //and the moment you can't see left or backwards, we've reached the end of the wall
+      //(backwards is prioritized over left)
+
+      //backwards
+      if(rc.canSenseLocation(wall.add(forwards.opposite()))){
+        if(prevDirection!=forwards &&!rc.sensePassability(wall.add(forwards.opposite()))){
+          rc.setIndicatorLine(wall,wall.add(forwards.opposite()),255,255,0);
+          wall = wall.add(forwards.opposite());
+          prevDirection = forwards.opposite();
+          continue;
+        }
+      }else{
+        break;
+      }
+
+      //left
+      if(rc.canSenseLocation(wall.add(rightOrLeft))){
+        if(prevDirection!= rightOrLeft.opposite() && !rc.sensePassability(wall.add(rightOrLeft))){
+          rc.setIndicatorLine(wall,wall.add(rightOrLeft),255,255,0);
+          wall = wall.add(rightOrLeft);
+          prevDirection = rightOrLeft;
+          continue;
+        }
+      }else{
+        break;
+      }
+      //the second two directions (forwards and right) have less precedent
+      //we need to make sure that they don't undo a previous left or backwards
+      //(forwards is prioritized over backwards)
+
+      //forwards
+      if(prevDirection!=forwards.opposite() && rc.canSenseLocation(wall.add(forwards))){
+        if(!rc.sensePassability(wall.add(forwards))){
+          rc.setIndicatorLine(wall,wall.add(forwards),255,255,0);
+          wall = wall.add(forwards);
+          prevDirection = forwards;
+          continue;
+        }
+      }else{
+        break;
+      }
+
+      //right
+      ///*
+      if(prevDirection!=rightOrLeft && rc.canSenseLocation(wall.add(rightOrLeft.opposite()))){
+        if(!rc.sensePassability(wall.add(rightOrLeft.opposite()))){
+          rc.setIndicatorLine(wall,wall.add(rightOrLeft.opposite()),255,255,0);
+          wall = wall.add(rightOrLeft.opposite());
+          prevDirection = rightOrLeft.opposite();
+          continue;
+        }
+      }
+      //*/
+      break;
+    }
+    return wall;
+  }
+
+  public static boolean isCardinalDirection(Direction d){
+    return d.dx*d.dy==0;
+  }
+  
+  
+
+  public static Direction touchingWall(RobotController rc) throws GameActionException{
     MapLocation current = rc.getLocation();
     if (!rc.canSenseLocation(current.add(Direction.EAST)) || !rc.sensePassability(current.add(Direction.EAST)) && !rc.canSenseRobotAtLocation(current.add(Direction.EAST))) return Direction.EAST;
     if (!rc.canSenseLocation(current.add(Direction.SOUTH)) || !rc.sensePassability(current.add(Direction.SOUTH)) && !rc.canSenseRobotAtLocation(current.add(Direction.SOUTH))) return Direction.SOUTH;
@@ -248,6 +317,17 @@ public class Utilities {
     if (!rc.canSenseLocation(current.add(Direction.NORTHWEST)) || !rc.sensePassability(current.add(Direction.NORTHWEST)) && !rc.canSenseRobotAtLocation(current.add(Direction.NORTHWEST))) return Direction.NORTHWEST;
     if (!rc.canSenseLocation(current.add(Direction.NORTHEAST)) || !rc.sensePassability(current.add(Direction.NORTHEAST)) && !rc.canSenseRobotAtLocation(current.add(Direction.NORTHEAST))) return Direction.NORTHEAST;
     return null;
+  }
+
+  //returns true if m is the centerwall
+  //returns false otherwise
+  public static boolean isCenterWall(MapLocation m, RobotController rc) throws GameActionException{
+    if(!rc.canSenseLocation(m)) return false;
+    if(rc.sensePassability(m)) return false;
+    MapInfo mapInfo = rc.senseMapInfo(m);
+    if(mapInfo.isWater()) return false;
+    if(mapInfo.isWall()) return false;
+    return true;
   }
 
   public static void fight(RobotController rc) throws GameActionException{
@@ -306,5 +386,36 @@ public class Utilities {
         rc.attack(weakestEnemy.getLocation());
       }
     }
+  }
+
+  public static void heal(RobotController rc) throws GameActionException{
+    MapLocation current = rc.getLocation();
+    RobotInfo[] allies = rc.senseNearbyRobots(6, rc.getTeam());
+    if(allies.length==0) return;
+
+    //find weakest ally
+    RobotInfo weakestAlly = allies[0];
+    for(int i=1;i<allies.length;++i){
+      if(allies[i].getHealth()<weakestAlly.getHealth()){
+        weakestAlly=allies[i];
+      }
+      if(allies[i].getHealth()<=weakestAlly.getHealth() && current.distanceSquaredTo(allies[i].getLocation())>current.distanceSquaredTo(weakestAlly.getLocation())){
+        weakestAlly=allies[i];
+      }
+    }
+
+    //weakest ally is at full health
+    if(weakestAlly.getHealth()==1000) return;
+
+    //attempt to heal weakest ally
+    if(rc.canHeal(weakestAlly.getLocation())){
+      rc.heal(weakestAlly.getLocation());
+    }else{
+      tryMove(current.directionTo(weakestAlly.getLocation()),rc);
+      if(rc.canHeal(weakestAlly.getLocation())){
+        rc.heal(weakestAlly.getLocation());
+      }
+    }
+
   }
 }

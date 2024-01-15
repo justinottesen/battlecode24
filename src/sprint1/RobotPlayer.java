@@ -35,6 +35,7 @@ public strictfp class RobotPlayer {
   };
 
   static MapLocation destination=null;
+  static boolean crumb = false;
   /**
    * run() is the method that is called when a robot is instantiated in the Battlecode world.
    * It is like the main function for your robot. If this method returns, the robot dies!
@@ -58,10 +59,13 @@ public strictfp class RobotPlayer {
         // Make sure you spawn your robot in before you attempt to take any actions!
         // Robots not spawned in do not have vision of any tiles and cannot perform any actions.
         while (!rc.isSpawned()) {
-          Utilities.shuffleArray(spawnLocs);
+          //Utilities.shuffleArray(spawnLocs);
+          /*
           for ( MapLocation loc : spawnLocs) {
             if (rc.canSpawn(loc)) { rc.spawn(loc); break; }
           }
+          */
+          if (rc.canSpawn(spawnLocs[0])) { rc.spawn(spawnLocs[0]);}
           //System.out.println("Unable to spawn");
           Clock.yield();
         }
@@ -74,21 +78,26 @@ public strictfp class RobotPlayer {
 
 
         Utilities.fight(rc);
-        if (rc.getRoundNum() <= GameConstants.SETUP_ROUNDS&&rc.senseNearbyCrumbs(20).length>0){
+        Utilities.heal(rc);
+        if (!crumb&&rc.getRoundNum() <= GameConstants.SETUP_ROUNDS&&rc.senseNearbyCrumbs(20).length>0){
           //look for crumbs
           MapLocation[] crumbLocations = rc.senseNearbyCrumbs(20);
           destination = crumbLocations[rng.nextInt(crumbLocations.length)];
+          crumb=true;
         }
 
         //move to a random location on the map
-        if(destination==null||destination.equals(rc.getLocation())) destination=Utilities.randMapLocation(rng, rc);
+        if(destination==null||destination.equals(rc.getLocation())){
+          destination=Utilities.randMapLocation(rng, rc);
+          crumb=false;
+        } 
         rc.setIndicatorDot(destination,255,0,0);
         Direction dir = Utilities.bugNav(rc,destination);
         //if the random location is impossible to get to, pick a new one
         if(dir==null){
           destination=Utilities.randMapLocation(rng, rc);
-          dir = Utilities.bugNav(rc,destination);
-          if(dir == null) dir = Direction.CENTER;
+          dir = Direction.CENTER;
+          crumb=false;
         }  
         Utilities.tryMove(dir, rc);
       
