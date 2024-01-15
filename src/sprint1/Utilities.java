@@ -314,6 +314,7 @@ public class Utilities {
     if(!isCardinalDirection(rightOrLeft)) throw new GameActionException(GameActionExceptionType.CANT_DO_THAT, "rightOrLeft isn't a cardinal direction: "+rightOrLeft);
     if(!isCardinalDirection(forwards)) throw new GameActionException(GameActionExceptionType.CANT_DO_THAT, "forwards isn't a cardinal direction: "+rightOrLeft);
     if(rightOrLeft.dx==forwards.dx||rightOrLeft.dy==forwards.dy) throw new GameActionException(GameActionExceptionType.CANT_DO_THAT, "rightOrLeft: "+rightOrLeft+" and forwards: "+forwards+" aren't 90 degrees apart");
+    rc.setIndicatorDot(wall,255,255,0);
     Direction prevDirection = rightOrLeft;
     while(rc.canSenseLocation(wall)){
       //the first two directions (left and backwards) take immediate precedent
@@ -360,7 +361,7 @@ public class Utilities {
       }
 
       //right
-      ///*
+      /*
       if(prevDirection!=rightOrLeft && rc.canSenseLocation(wall.add(rightOrLeft.opposite()))){
         if(!rc.sensePassability(wall.add(rightOrLeft.opposite()))){
           rc.setIndicatorLine(wall,wall.add(rightOrLeft.opposite()),255,255,0);
@@ -369,7 +370,7 @@ public class Utilities {
           continue;
         }
       }
-      //*/
+      */
       break;
     }
     return wall;
