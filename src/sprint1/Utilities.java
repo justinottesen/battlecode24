@@ -21,6 +21,25 @@ public class Utilities {
     if (rc.canMove(d.rotateLeft().rotateLeft())) rc.move(d.rotateLeft().rotateLeft());
     if (rc.canMove(d.rotateRight().rotateRight())) rc.move(d.rotateRight().rotateRight());
   }
+
+  public static void tryMoveWithFill(Direction d, RobotController rc) throws GameActionException{
+    MapLocation current = rc.getLocation();
+    
+    if(rc.canFill(current.add(d))) rc.fill(current.add(d));
+    if (rc.canMove(d)) rc.move(d);
+
+    if(rc.canFill(current.add(d.rotateRight()))) rc.fill(current.add(d.rotateRight()));
+    if (rc.canMove(d.rotateRight())) rc.move(d.rotateRight());
+
+    if(rc.canFill(current.add(d.rotateLeft()))) rc.fill(current.add(d.rotateLeft()));
+    if (rc.canMove(d.rotateLeft())) rc.move(d.rotateLeft());
+
+    if(rc.canFill(current.add(d.rotateRight().rotateRight()))) rc.fill(current.add(d.rotateRight().rotateRight()));
+    if (rc.canMove(d.rotateRight().rotateRight())) rc.move(d.rotateRight().rotateRight());
+
+    if(rc.canFill(current.add(d.rotateLeft().rotateLeft()))) rc.fill(current.add(d.rotateLeft().rotateLeft()));
+    if (rc.canMove(d.rotateLeft().rotateLeft())) rc.move(d.rotateLeft().rotateLeft());
+  }
   
   public static Direction tryDirection(Direction d, RobotController rc) throws GameActionException{
     Direction tryDirection=d;
@@ -94,13 +113,15 @@ public class Utilities {
       //rc.setIndicatorString("prev dMin: "+dMin+" new dMin: "+wallEncountered.distanceSquaredTo(destination));
       dMin = wallEncountered.distanceSquaredTo(destination);
       stupidBugMode=false;
+      lastWall=null;
+      preventLooping=null;
       //reset the default direction
       defaultDirection=rc.getID()%2==0;
     }
 
     if(!stupidBugMode){
       //not stupidBugMode
-      if(rc.sensePassability(wallEncountered)){
+      if(sensePassabilityWithFilling(wallEncountered, rc)){
         //go in straight line to the destination
         rc.setIndicatorLine(current,destination,255,0,0);
         rc.setIndicatorString("straight shot to "+destination);
@@ -175,15 +196,15 @@ public class Utilities {
     //line1
     current=next;
     next = current.add(current.directionTo(destination));
-    if(current.equals(destination)||!rc.canSenseLocation(next)||!rc.sensePassability(current)) return current;
+    if(current.equals(destination)||!rc.canSenseLocation(next)||!sensePassabilityWithFilling(current, rc)) return current;
     //line2
     current=next;
     next = current.add(current.directionTo(destination));
-    if(current.equals(destination)||!rc.canSenseLocation(next)||!rc.sensePassability(current)) return current;
+    if(current.equals(destination)||!rc.canSenseLocation(next)||!sensePassabilityWithFilling(current, rc)) return current;
     //line3
     current=next;
     next = current.add(current.directionTo(destination));
-    if(current.equals(destination)||!rc.canSenseLocation(next)||!rc.sensePassability(current)) return current;
+    if(current.equals(destination)||!rc.canSenseLocation(next)||!sensePassabilityWithFilling(current, rc)) return current;
     return next;
   }
 
@@ -198,15 +219,15 @@ public class Utilities {
     //line1
     current=next;
     next = current.add(d);
-    if(!rc.canSenseLocation(next)||!rc.sensePassability(current)) return current;
+    if(!rc.canSenseLocation(next)||!sensePassabilityWithFilling(current, rc)) return current;
     //line2
     current=next;
     next = current.add(d);
-    if(!rc.canSenseLocation(next)||!rc.sensePassability(current)) return current;
+    if(!rc.canSenseLocation(next)||!sensePassabilityWithFilling(current, rc)) return current;
     //line3
     current=next;
     next = current.add(d);
-    if(!rc.canSenseLocation(next)||!rc.sensePassability(current)) return current;
+    if(!rc.canSenseLocation(next)||!sensePassabilityWithFilling(current, rc)) return current;
     return next;
   }
 
@@ -310,7 +331,7 @@ public class Utilities {
   //Wall must be a wall/impassible terrain that is bordering a square that is passible
   //rightOrLeft and Forwards must form a 90 degree angle and they must be cardinal directions
   public static MapLocation followWall(MapLocation wall, Direction rightOrLeft, Direction forwards, RobotController rc) throws GameActionException{
-    if(!rc.canSenseLocation(wall)||rc.sensePassability(wall)) throw new GameActionException(GameActionExceptionType.CANT_DO_THAT,"invalid wall: "+wall);
+    if(!rc.canSenseLocation(wall)||sensePassabilityWithFilling(wall, rc)) throw new GameActionException(GameActionExceptionType.CANT_DO_THAT,"invalid wall: "+wall);
     if(!isCardinalDirection(rightOrLeft)) throw new GameActionException(GameActionExceptionType.CANT_DO_THAT, "rightOrLeft isn't a cardinal direction: "+rightOrLeft);
     if(!isCardinalDirection(forwards)) throw new GameActionException(GameActionExceptionType.CANT_DO_THAT, "forwards isn't a cardinal direction: "+rightOrLeft);
     if(rightOrLeft.dx==forwards.dx||rightOrLeft.dy==forwards.dy) throw new GameActionException(GameActionExceptionType.CANT_DO_THAT, "rightOrLeft: "+rightOrLeft+" and forwards: "+forwards+" aren't 90 degrees apart");
@@ -323,7 +344,7 @@ public class Utilities {
 
       //backwards
       if(rc.canSenseLocation(wall.add(forwards.opposite()))){
-        if(prevDirection!=forwards &&!rc.sensePassability(wall.add(forwards.opposite()))){
+        if(prevDirection!=forwards &&!sensePassabilityWithFilling(wall.add(forwards.opposite()),rc)){
           rc.setIndicatorLine(wall,wall.add(forwards.opposite()),255,255,0);
           wall = wall.add(forwards.opposite());
           prevDirection = forwards.opposite();
@@ -335,7 +356,7 @@ public class Utilities {
 
       //left
       if(rc.canSenseLocation(wall.add(rightOrLeft))){
-        if(prevDirection!= rightOrLeft.opposite() && !rc.sensePassability(wall.add(rightOrLeft))){
+        if(prevDirection!= rightOrLeft.opposite() && !sensePassabilityWithFilling(wall.add(rightOrLeft),rc)){
           rc.setIndicatorLine(wall,wall.add(rightOrLeft),255,255,0);
           wall = wall.add(rightOrLeft);
           prevDirection = rightOrLeft;
@@ -350,7 +371,7 @@ public class Utilities {
 
       //forwards
       if(prevDirection!=forwards.opposite() && rc.canSenseLocation(wall.add(forwards))){
-        if(!rc.sensePassability(wall.add(forwards))){
+        if(!sensePassabilityWithFilling(wall.add(forwards),rc)){
           rc.setIndicatorLine(wall,wall.add(forwards),255,255,0);
           wall = wall.add(forwards);
           prevDirection = forwards;
@@ -363,7 +384,7 @@ public class Utilities {
       //right
       /*
       if(prevDirection!=rightOrLeft && rc.canSenseLocation(wall.add(rightOrLeft.opposite()))){
-        if(!rc.sensePassability(wall.add(rightOrLeft.opposite()))){
+        if(!sensePassabilityWithFilling(wall.add(rightOrLeft.opposite()),rc)){
           rc.setIndicatorLine(wall,wall.add(rightOrLeft.opposite()),255,255,0);
           wall = wall.add(rightOrLeft.opposite());
           prevDirection = rightOrLeft.opposite();
@@ -380,7 +401,11 @@ public class Utilities {
     return d.dx*d.dy==0;
   }
   
-  
+  public static boolean sensePassabilityWithFilling(MapLocation m, RobotController rc) throws GameActionException{
+    if(!inBounds(m,rc)) return false;
+    MapInfo mapInfo = rc.senseMapInfo(m);
+    return !(mapInfo.isWall()||mapInfo.isDam());
+  }
 
   public static Direction touchingWall(RobotController rc) throws GameActionException{
     MapLocation current = rc.getLocation();

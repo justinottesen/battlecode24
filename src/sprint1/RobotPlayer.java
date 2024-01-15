@@ -99,7 +99,8 @@ public strictfp class RobotPlayer {
           dir = Utilities.bugNav(rc,destination);
           if(dir == null) dir = Direction.CENTER;
         }
-        Utilities.tryMove(dir, rc);
+        //Utilities.tryMove(dir, rc);
+        Utilities.tryMoveWithFill(dir,rc);
 
       } catch (GameActionException e) {
         // Oh no! It looks like we did something illegal in the Battlecode world. You should
