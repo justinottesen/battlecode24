@@ -109,6 +109,7 @@ public strictfp class RobotPlayer {
           waterTrapBuilt = null;
         }else{
           Utilities.fight(rc);
+          Utilities.heal(rc);
           if (isExplorer && rc.getRoundNum() <= GameConstants.SETUP_ROUNDS&&rc.senseNearbyCrumbs(20).length>0){
             //look for crumbs
             MapLocation[] crumbLocations = rc.senseNearbyCrumbs(20);
@@ -125,7 +126,7 @@ public strictfp class RobotPlayer {
             dir = Utilities.bugNav(rc,destination);
             if(dir == null) dir = Direction.CENTER;
           }
-          Utilities.tryMove(dir, rc);
+          Utilities.tryMoveWithFill(dir, rc);
         }
       } catch (GameActionException e) {
         System.out.println("GameActionException");
