@@ -2,6 +2,7 @@ package sprint1;
 
 import battlecode.common.*;
 import java.util.Random;
+import java.lang.Math;
 
 public class Utilities {
   //default direction refers to which direction (right or left) the robot defaults to
@@ -13,34 +14,6 @@ public class Utilities {
   private static boolean stupidBugMode = false;
   private static MapLocation preventLooping = null;
   private static MapLocation lastWall = null;
-
-  public static MapLocation getClosest(MapLocation me, MapLocation[] locs) {
-    assert(locs.length > 0);
-    MapLocation closest = null;
-    int min_dist = 9999; 
-    for (MapLocation loc : locs) {
-      int current_dist = me.distanceSquaredTo(loc);
-      if (current_dist < min_dist) {
-        current_dist = min_dist;
-        closest = loc;
-      }
-    }
-    return closest;
-  }
-
-  public static FlagInfo getClosest(MapLocation me, FlagInfo[] flags) {
-    assert(flags.length > 0);
-    FlagInfo closest = null;
-    int min_dist = 9999; 
-    for (FlagInfo flag : flags) {
-      int current_dist = me.distanceSquaredTo(flag.getLocation());
-      if (current_dist < min_dist) {
-        current_dist = min_dist;
-        closest = flag;
-      }
-    }
-    return closest;
-  }
 
   public static void tryMove(Direction d, RobotController rc) throws GameActionException{
     if (rc.canMove(d)) rc.move(d);
@@ -111,6 +84,34 @@ public class Utilities {
           array[i] = temp;
         }
     }
+  }
+
+  public static MapLocation getClosest(MapLocation me, MapLocation[] locs) {
+    assert(locs.length > 0);
+    MapLocation closest = null;
+    int min_dist = 9999; 
+    for (MapLocation loc : locs) {
+      int current_dist = me.distanceSquaredTo(loc);
+      if (current_dist < min_dist) {
+        current_dist = min_dist;
+        closest = loc;
+      }
+    }
+    return closest;
+  }
+
+  public static FlagInfo getClosest(MapLocation me, FlagInfo[] flags) {
+    assert(flags.length > 0);
+    FlagInfo closest = null;
+    int min_dist = 9999; 
+    for (FlagInfo flag : flags) {
+      int current_dist = me.distanceSquaredTo(flag.getLocation());
+      if (current_dist < min_dist) {
+        current_dist = min_dist;
+        closest = flag;
+      }
+    }
+    return closest;
   }
 
   public static boolean inBounds(MapLocation m, RobotController rc){
@@ -474,6 +475,7 @@ public class Utilities {
   public static void fight(RobotController rc) throws GameActionException{
     MapLocation current = rc.getLocation();
     RobotInfo[] enemies = rc.senseNearbyRobots(-1, rc.getTeam().opponent());
+    int attackStrength = getAttackDamage(rc);
     if(enemies.length==0) return;
     RobotInfo[] enemiesWithinAttack = rc.senseNearbyRobots(4, rc.getTeam().opponent());
 
@@ -484,7 +486,7 @@ public class Utilities {
       tryMove(enemiesWithinAttack[0].getLocation().directionTo(current),rc);
     }
 
-    if(rc.getHealth()<225){
+    if(rc.getHealth()<attackStrength){
       //retreat cuz low health
       tryMove(enemies[0].getLocation().directionTo(current),rc);
     }
@@ -495,7 +497,7 @@ public class Utilities {
     //the next stuff has to do with attacking, so return if we can't attack
     if(rc.getActionCooldownTurns()>=10) return;
 
-    if(enemies.length>5)  bomb(rc);
+    //if(enemies.length>5)  bomb(rc);
 
     if(rc.getMovementCooldownTurns()<10){
       //can move, increase our attack range by one movement
@@ -519,6 +521,8 @@ public class Utilities {
 
     //attack
     if(rc.canAttack(weakestEnemy.getLocation())){
+      if(rc.canWriteSharedArray(1, rc.readSharedArray(1)+attackStrength))
+        rc.writeSharedArray(1,rc.readSharedArray(1)+attackStrength);
       rc.attack(weakestEnemy.getLocation());
     }else{
       //move and attack
@@ -526,6 +530,8 @@ public class Utilities {
         rc.move(current.directionTo(weakestEnemy.getLocation()));
       }
       if(rc.canAttack(weakestEnemy.getLocation())){
+        if(rc.canWriteSharedArray(1, rc.readSharedArray(1)+attackStrength))
+          rc.writeSharedArray(1,rc.readSharedArray(1)+attackStrength);
         rc.attack(weakestEnemy.getLocation());
       }
     }
@@ -547,15 +553,20 @@ public class Utilities {
       }
     }
 
-    //weakest ally is at full health
-    if(weakestAlly.getHealth()==1000) return;
+    int healStrength = getHealStrength(rc);
+    //weakest ally is at full health (or healing would not get all its value)
+    if(weakestAlly.getHealth()>=1000-healStrength) return;
 
     //attempt to heal weakest ally
     if(rc.canHeal(weakestAlly.getLocation())){
+      if(rc.canWriteSharedArray(2, rc.readSharedArray(2)+healStrength))
+        rc.writeSharedArray(2,rc.readSharedArray(2)+healStrength);
       rc.heal(weakestAlly.getLocation());
     }else{
       tryMove(current.directionTo(weakestAlly.getLocation()),rc);
       if(rc.canHeal(weakestAlly.getLocation())){
+        if(rc.canWriteSharedArray(2, rc.readSharedArray(2)+healStrength))
+          rc.writeSharedArray(2,rc.readSharedArray(2)+healStrength);
         rc.heal(weakestAlly.getLocation());
       }
     }
@@ -568,5 +579,20 @@ public class Utilities {
       if(rc.canBuild(TrapType.EXPLOSIVE,rc.getLocation().add(d[i])))
         rc.build(TrapType.EXPLOSIVE, rc.getLocation().add(d[i]));
     }
+  }
+
+  private static int getAttackDamage(RobotController rc) {
+    int damage = Math.round(SkillType.ATTACK.skillEffect * ((float) SkillType.ATTACK.getSkillEffect(rc.getLevel(SkillType.ATTACK)) / 100 + 1));
+    return damage;
+  }
+  private static int getHealStrength(RobotController rc) {
+    int base_heal = SkillType.HEAL.skillEffect;
+    //check for upgrade
+    /*
+    if (rc.getGlobalUpgrades(team)[2]){
+        base_heal += GlobalUpgrade.HEALING.baseHealChange;
+    }
+    */
+    return Math.round(base_heal * ((float) SkillType.HEAL.getSkillEffect(rc.getLevel(SkillType.HEAL)) / 100 + 1)); 
   }
 }

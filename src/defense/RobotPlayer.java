@@ -3,7 +3,7 @@ package defense;
 import battlecode.common.*;
 
 import java.util.Random;
-import defense.Utilities;
+import sprint1.Utilities;
 
 public strictfp class RobotPlayer {
 
