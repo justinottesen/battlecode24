@@ -76,17 +76,33 @@ public strictfp class RobotPlayer {
           
         }
 
-        //buy Action if available
-        if(rc.canBuyGlobal(GlobalUpgrade.ACTION)){
-          rc.buyGlobal(GlobalUpgrade.ACTION);
-        }
+        // Go back to base if you have flag
+        if (rc.hasFlag()) {
+          destination = Utilities.getClosest(rc.getLocation(), spawnLocs);
+        } else {
+          //buy Action if available
+          if(rc.canBuyGlobal(GlobalUpgrade.ACTION)){
+            rc.buyGlobal(GlobalUpgrade.ACTION);
+          }
 
-        Utilities.fight(rc);
-        Utilities.heal(rc);
-        if (isExplorer && rc.getRoundNum() <= GameConstants.SETUP_ROUNDS&&rc.senseNearbyCrumbs(20).length>0){
-          //look for crumbs
-          MapLocation[] crumbLocations = rc.senseNearbyCrumbs(20);
-          destination = crumbLocations[rng.nextInt(crumbLocations.length)];
+          Utilities.fight(rc);
+          Utilities.heal(rc);
+
+          // Look for nearby enemy flags
+          FlagInfo[] flags = rc.senseNearbyFlags(-1, rc.getTeam().opponent());
+          if (flags.length > 0) {
+            // Go towards flag
+            destination = Utilities.getClosest(rc.getLocation(), flags).getLocation();
+            // If you can pick up flag, do it and head back to base
+            if (rc.canPickupFlag(destination)) {
+              rc.pickupFlag(destination);
+              destination = Utilities.getClosest(rc.getLocation(), spawnLocs);
+            }
+          } else if (isExplorer && rc.getRoundNum() <= GameConstants.SETUP_ROUNDS&&rc.senseNearbyCrumbs(20).length>0){
+            //look for crumbs
+            MapLocation[] crumbLocations = rc.senseNearbyCrumbs(20);
+            destination = crumbLocations[rng.nextInt(crumbLocations.length)];
+          }
         }
 
         //move to a random location on the map

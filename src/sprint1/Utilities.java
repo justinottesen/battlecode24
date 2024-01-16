@@ -14,6 +14,34 @@ public class Utilities {
   private static MapLocation preventLooping = null;
   private static MapLocation lastWall = null;
 
+  public static MapLocation getClosest(MapLocation me, MapLocation[] locs) {
+    assert(locs.length > 0);
+    MapLocation closest = null;
+    int min_dist = 9999; 
+    for (MapLocation loc : locs) {
+      int current_dist = me.distanceSquaredTo(loc);
+      if (current_dist < min_dist) {
+        current_dist = min_dist;
+        closest = loc;
+      }
+    }
+    return closest;
+  }
+
+  public static FlagInfo getClosest(MapLocation me, FlagInfo[] flags) {
+    assert(flags.length > 0);
+    FlagInfo closest = null;
+    int min_dist = 9999; 
+    for (FlagInfo flag : flags) {
+      int current_dist = me.distanceSquaredTo(flag.getLocation());
+      if (current_dist < min_dist) {
+        current_dist = min_dist;
+        closest = flag;
+      }
+    }
+    return closest;
+  }
+
   public static void tryMove(Direction d, RobotController rc) throws GameActionException{
     if (rc.canMove(d)) rc.move(d);
     if (rc.canMove(d.rotateLeft())) rc.move(d.rotateLeft());
