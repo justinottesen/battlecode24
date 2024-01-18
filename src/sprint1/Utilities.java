@@ -479,6 +479,8 @@ public class Utilities {
     if(enemies.length==0) return;
     RobotInfo[] enemiesWithinAttack = rc.senseNearbyRobots(4, rc.getTeam().opponent());
 
+    attackEnemyWithOurFlag(rc);
+
     //retreat logic
 
     if(enemiesWithinAttack.length>0&&!(rc.getActionCooldownTurns()>=10)){
@@ -533,6 +535,32 @@ public class Utilities {
         if(rc.canWriteSharedArray(1, rc.readSharedArray(1)+attackStrength))
           rc.writeSharedArray(1,rc.readSharedArray(1)+attackStrength);
         rc.attack(weakestEnemy.getLocation());
+      }
+    }
+  }
+
+
+  public static void attackEnemyWithOurFlag(RobotController rc) throws GameActionException{
+    FlagInfo[] flags = rc.senseNearbyFlags(-1,rc.getTeam());
+    if(flags.length==0) return;
+    for(int i=0;i<flags.length;++i){
+      rc.setIndicatorDot(flags[i].getLocation(), 0, 0, 0);
+      if(!rc.canSenseLocation(flags[i].getLocation())||rc.senseRobotAtLocation(flags[i].getLocation())==null) continue;
+      if(rc.senseRobotAtLocation(flags[i].getLocation()).team.equals(rc.getTeam().opponent())){
+        //attack enemy flag carrier
+        MapLocation current = rc.getLocation();
+        int attackStrength = getAttackDamage(rc);
+        //move and attack
+        if(rc.canMove(current.directionTo(flags[i].getLocation()))){
+          rc.move(current.directionTo(flags[i].getLocation()));
+          rc.setIndicatorString("moving towards enemy flag carrier at "+flags[i].getLocation());
+        }
+        if(rc.canAttack(flags[i].getLocation())){
+          if(rc.canWriteSharedArray(1, rc.readSharedArray(1)+attackStrength))
+            rc.writeSharedArray(1,rc.readSharedArray(1)+attackStrength);
+          rc.attack(flags[i].getLocation());
+          rc.setIndicatorLine(current, flags[i].getLocation(), 255, 50, 50);
+        }
       }
     }
   }

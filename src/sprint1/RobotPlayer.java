@@ -108,15 +108,18 @@ public strictfp class RobotPlayer {
         //move to a random location on the map
         if(destination==null||destination.equals(rc.getLocation())) destination=Utilities.randMapLocation(rng, rc);
         rc.setIndicatorDot(destination,255,0,0);
-        Direction dir = Utilities.bugNav(rc,destination);
-        //if the random location is impossible to get to, pick a new one
-        if(dir==null){
-          destination=Utilities.randMapLocation(rng, rc);
-          dir = Utilities.bugNav(rc,destination);
-          if(dir == null) dir = Direction.CENTER;
+
+        if(rc.getMovementCooldownTurns()<=10){
+          Direction dir = Utilities.bugNav(rc,destination);
+          //if the random location is impossible to get to, pick a new one
+          if(dir==null){
+            destination=Utilities.randMapLocation(rng, rc);
+            dir = Utilities.bugNav(rc,destination);
+            if(dir == null) dir = Direction.CENTER;
+          }
+          //Utilities.tryMove(dir, rc);
+          Utilities.tryMoveWithFill(dir,rc);
         }
-        //Utilities.tryMove(dir, rc);
-        Utilities.tryMoveWithFill(dir,rc);
 
       } catch (GameActionException e) {
         // Oh no! It looks like we did something illegal in the Battlecode world. You should
