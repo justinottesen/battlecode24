@@ -499,7 +499,7 @@ public class Utilities {
     //the next stuff has to do with attacking, so return if we can't attack
     if(rc.getActionCooldownTurns()>=10) return;
 
-    //if(enemies.length>5)  bomb(rc);
+    if(enemies.length>7)  bomb(rc);
 
     if(rc.getMovementCooldownTurns()<10){
       //can move, increase our attack range by one movement

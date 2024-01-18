@@ -93,6 +93,11 @@ public strictfp class RobotPlayer {
           if (flags.length > 0) {
             // Go towards flag
             destination = Utilities.getClosest(rc.getLocation(), flags).getLocation();
+            //if the flag is being carried by us
+            if(rc.canSenseRobotAtLocation(destination)&&rc.senseRobotAtLocation(destination).team.equals(rc.getTeam())){
+              Direction awayFromFlagCarrier = destination.directionTo(rc.getLocation());
+              destination = destination.add(awayFromFlagCarrier).add(awayFromFlagCarrier);
+            }
             // If you can pick up flag, do it and head back to base
             if (rc.canPickupFlag(destination)) {
               rc.pickupFlag(destination);
