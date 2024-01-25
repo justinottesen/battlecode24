@@ -35,7 +35,7 @@ public strictfp class RobotPlayer {
   };
 
   static MapLocation destination=new MapLocation(15,15);
-  static final int numberToSpawn = 5;
+  static final int numberToSpawn = 10;
   /**
    * run() is the method that is called when a robot is instantiated in the Battlecode world.
    * It is like the main function for your robot. If this method returns, the robot dies!

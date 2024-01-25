@@ -1,5 +1,6 @@
 package justin;
 
+//import java.time.Clock;
 import java.util.Random;
 
 import battlecode.common.*;
@@ -8,6 +9,8 @@ public strictfp class RobotPlayer {
 
   private static final Random rng = new Random(69);
   private static int turnCount = 1;
+
+  static final int numberToSpawn = 10;
 
   // Initialized in Turn 1
   private static MapLocation[] spawnLocs = null;
@@ -65,14 +68,15 @@ public strictfp class RobotPlayer {
         if (friends.length == 0 && enemies.length == 0) {
           // Move towards middle of map
           fillWater(rc);
-          Direction dir = rc.getLocation().directionTo(mapCenter);
-          fuzzyMove(rc, dir, 1);
+          //Direction dir = rc.getLocation().directionTo(mapCenter);
+          //Utilities.fuzzyMove(rc, dir, 1);
+          Utilities.bugNav(rc,mapCenter);
         } else if (enemies.length == 0) {
           MapLocation closest = friends[0].getLocation();
           if (turnCount <= GameConstants.SETUP_ROUNDS - Math.max(mapHeight, mapWidth)/2) {
             // Move away from friends
             Direction dir = closest.directionTo(rc.getLocation());
-            fuzzyMove(rc, dir, 1);
+            Utilities.fuzzyMove(rc, dir, 1);
           } else {
             // Heal anyone around
             for (RobotInfo friend : friends) {
@@ -82,9 +86,12 @@ public strictfp class RobotPlayer {
               }
             }
             // Move towards middle
-            Direction dir = rc.getLocation().directionTo(mapCenter);
-            fuzzyMove(rc, dir, 1);
+            //Direction dir = rc.getLocation().directionTo(mapCenter);
+            //Utilities.fuzzyMove(rc, dir, 1);
+            fillWater(rc);
+            Utilities.bugNav(rc,mapCenter);
           }
+        /*
         } else if (friends.length < enemies.length) {
           // Attack enemy if possible
           MapLocation closest = enemies[0].getLocation();
@@ -98,8 +105,9 @@ public strictfp class RobotPlayer {
               rc.heal(friend.getLocation());
             }
           }
+          //run away
           Direction dir = closest.directionTo(rc.getLocation());
-          fuzzyMove(rc, dir, 1);
+          Utilities.fuzzyMove(rc, dir, 1);
         } else if (enemies.length <= friends.length) {
           // Attack enemy if possible & chase
           MapLocation closestEnemy = enemies[0].getLocation();
@@ -111,11 +119,11 @@ public strictfp class RobotPlayer {
             rc.attack(closestEnemy);
           }
           Direction dir = rc.getLocation().directionTo(closestEnemy);
-          fuzzyMove(rc, dir, 1);
+          Utilities.fuzzyMove(rc, dir, 1);
+        */
         } else {
-          System.out.println("I DON'T KNOW WHAT TO DO!!!");
-          System.out.println(friends.length);
-          System.out.println(enemies.length);
+          Utilities.fight(rc);
+          Utilities.heal(rc);
         }
         
       } catch (GameActionException e) {
@@ -220,7 +228,7 @@ public strictfp class RobotPlayer {
       if (rc.getLocation().equals(myCenter)) {
         moveRandom(rc);
       } else {
-        fuzzyMove(rc, myCenter.directionTo(rc.getLocation()), 1);
+        Utilities.fuzzyMove(rc, myCenter.directionTo(rc.getLocation()), 1);
       }
     }
   }
@@ -229,8 +237,9 @@ public strictfp class RobotPlayer {
     // Try to spawn on edges first
     Utilities.shuffleInPlace(spawnEdges);
     for (MapLocation loc : spawnEdges) {
-      if (rc.canSpawn(loc)) {
+      if (rc.canSpawn(loc)/*&&rc.readSharedArray(0)<numberToSpawn*/) {
         rc.spawn(loc);
+        //rc.writeSharedArray(0,rc.readSharedArray(0)+1);
         return true;
       }
     }
@@ -238,8 +247,9 @@ public strictfp class RobotPlayer {
     // Centers if you have to
     Utilities.shuffleInPlace(spawnCenters);
     for (MapLocation loc : spawnCenters) {
-      if (rc.canSpawn(loc)) {
+      if (rc.canSpawn(loc)&&rc.readSharedArray(0)<numberToSpawn) {
         rc.spawn(loc);
+        rc.writeSharedArray(0,rc.readSharedArray(0)+1);
         return true;
       }
     }
@@ -267,31 +277,9 @@ public strictfp class RobotPlayer {
     return edges;
   }
 
-  // Attempts to move in a direction with some leeway
-  private static boolean fuzzyMove(RobotController rc, Direction dir, int fuzz) throws GameActionException {
-    if (rc.canMove(dir)) {
-      rc.move(dir);
-      return true;
-    }
-    Direction left = dir;
-    Direction right = dir;
-    for (int i = 1; i <= fuzz; ++i) {
-      left = left.rotateLeft();
-      right = right.rotateRight();
-      if (rc.canMove(left)) {
-        rc.move(left);
-        return true;
-      }
-      if (rc.canMove(right)) {
-        rc.move(right);
-        return true;
-      }
-    }
-    return false;
-  }
   private static boolean moveRandom(RobotController rc) throws GameActionException {
     Direction dir = Utilities.allDirs[rng.nextInt(8)];
-    return fuzzyMove(rc, dir, 4);
+    return Utilities.fuzzyMove(rc, dir, 4);
   }
 
   private static void crumbSearch(RobotController rc) throws GameActionException {
@@ -301,7 +289,7 @@ public strictfp class RobotPlayer {
       fillWater(rc);
       MapLocation closest = Utilities.getClosest(rc.getLocation(), crumbs);
       Direction dir = rc.getLocation().directionTo(closest);
-      fuzzyMove(rc, dir, 1);
+      Utilities.fuzzyMove(rc, dir, 1);
     }
   }
   
